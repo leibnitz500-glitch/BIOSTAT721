@@ -133,11 +133,11 @@ ggplot(pm_monthly, aes(month, PM25, color = factor(year),
         plot.title = element_text(face = "bold"))
 ```
 
-I used connected points for monthly means to show changes through the year and make differences between years easy to compare without overlapping daily observations.
+I connected the monthly averages so I could see how PM2.5 changed from one month to the next within each year.
 
 # Interpretation
 
-CO was highest in late fall and winter, while O3 was highest in spring and summer, with the pooled O3 mean peaking in June. PM2.5 varied across years rather than following one consistent seasonal pattern: August and December were higher in 2018 than in 2019, and January-February 2020 had lower means than either earlier year despite 2020 having the largest daily PM2.5 maximum (31.200 ug/m3 LC). That contrast shows why a single daily maximum does not describe a typical month; the 2020 comparison covers January-April only, and the pooled May-December estimates use two years instead of three.
+CO was highest in late fall and winter, while O3 was highest in spring and summer, with the pooled O3 mean peaking in June. In January and February, average PM2.5 was lower in 2020 than in the same months of 2018 and 2019, even though the highest daily PM2.5 value occurred in 2020. The 2020 data end in April, so only 2018 and 2019 contribute to the May–December averages.
 
 # AI use statement
 
