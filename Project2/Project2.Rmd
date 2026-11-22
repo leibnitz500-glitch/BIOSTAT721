@@ -141,4 +141,4 @@ CO was highest in late fall and winter, while O3 was highest in spring and summe
 
 # AI use statement
 
-I used AI to help develop the cleaning function, organize the RMarkdown report, and draft the explanations. The code was run on all three input files, and its output was checked against separate calculations for daily averages, annual ranges, and monthly confidence intervals.
+I used ChatGPT to discuss the project questions and analysis plan, then generate initial R code and draft explanations based on that discussion. I reviewed the code and results, asked for revisions, and made changes to better match the project requirements and my understanding. The final report reflects these rounds of review and revision.
