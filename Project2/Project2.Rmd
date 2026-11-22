@@ -1,0 +1,144 @@
+---
+title: "Air Pollution Patterns at RDU Airport"
+author: "Yan Yan"
+date: "November 22, 2026"
+output:
+  word_document:
+    reference_docx: reference.docx
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE,
+                      fig.path = "figures/", dpi = 300,
+                      fig.width = 6.3, fig.height = 3.7)
+library(ggplot2)
+source("R/clean_air_quality.R")
+
+# Apply the same cleaning rules to each year, then combine daily records.
+years <- 2018:2020
+annual_data <- lapply(years, function(year) {
+  clean_air_quality(file.path("data", paste0("AQ_", year, ".csv")))
+})
+air <- do.call(rbind, annual_data)
+air$year <- as.integer(format(air$date, "%Y"))
+air$month <- as.integer(format(air$date, "%m"))
+
+dir.create("output", showWarnings = FALSE)
+write.csv(air, "output/air_quality_daily.csv", row.names = FALSE, na = "")
+
+# Pool daily observations across years within each calendar month.
+monthly_stats <- do.call(rbind, lapply(c("CO", "O3"), function(pollutant) {
+  do.call(rbind, lapply(1:12, function(month) {
+    values <- air[[pollutant]][air$month == month]
+    values <- values[!is.na(values)]
+    n <- length(values)
+    avg <- mean(values)
+    margin <- 1.96 * sd(values) / sqrt(n)
+    data.frame(pollutant = pollutant, month = month, n = n,
+               mean = avg, lower = avg - margin, upper = avg + margin)
+  }))
+}))
+write.csv(monthly_stats, "output/monthly_CO_O3.csv", row.names = FALSE)
+```
+
+GitHub repository: [BIOSTAT721](https://github.com/leibnitz500-glitch/BIOSTAT721)
+
+# Purpose and data preparation
+
+This project describes daily CO, PM2.5, and O3 measurements from the EPA monitor at RDU airport during 2018, 2019, and January-April 2020. These patterns provide an exposure summary for the proposed study of air pollution and sickle cell disease in Durham County.
+
+I removed identical rows, converted negative measurements to zero, and then averaged the remaining measurements within each day. Removing duplicates first prevents repeated records from receiving extra weight; correcting negatives before averaging prevents a measurement error from lowering the daily mean. Missing measurements remain missing, including four dates absent from the 2018 file, and O3 is reported in ppm unless the function's user requests ppb.
+
+# Daily concentration ranges
+
+```{r annual-tables, results='asis'}
+# Use formatted strings so trailing zeros are retained in all three tables.
+for (i in seq_along(years)) {
+  daily <- annual_data[[i]]
+  ranges <- data.frame(
+    Pollutant = c("CO (ppm)", "PM2.5 (ug/m3 LC)", "O3 (ppm)"),
+    Minimum = vapply(daily[c("CO", "PM25", "O3")], function(x) {
+      sprintf("%.3f", min(x, na.rm = TRUE))
+    }, character(1)),
+    Maximum = vapply(daily[c("CO", "PM25", "O3")], function(x) {
+      sprintf("%.3f", max(x, na.rm = TRUE))
+    }, character(1)), row.names = NULL
+  )
+  period <- if (years[i] == 2020) "January-April 2020" else as.character(years[i])
+  cat(knitr::kable(ranges, align = c("l", "r", "r"),
+                  caption = paste0("Table ", i, ". Daily concentration ranges in ", period, ".")),
+      sep = "\n")
+  cat("\n\n")
+}
+```
+
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
+
+# Monthly CO and ozone patterns
+
+```{r co-ozone, fig.height=4.1}
+monthly_stats$pollutant <- factor(monthly_stats$pollutant, levels = c("CO", "O3"))
+
+# Separate y-axis scales preserve each pollutant's original units and pattern.
+ggplot(monthly_stats, aes(month, mean, color = pollutant)) +
+  geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.18, linewidth = 0.5) +
+  geom_point(size = 2.4) +
+  facet_wrap(~pollutant, ncol = 1, scales = "free_y",
+             labeller = as_labeller(c(CO = "CO (ppm)", O3 = "O3 (ppm)"))) +
+  scale_color_manual(values = c(CO = "#0072B2", O3 = "#D55E00"),
+                     labels = c("CO", "O3"), name = "Pollutant") +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(title = "Monthly CO and O3 concentrations",
+       subtitle = "Pooled daily means with 95% confidence intervals",
+       x = "Month", y = "Concentration (ppm)",
+       caption = "Jan-Apr: 2018-2020; May-Dec: 2018-2019. Missing values excluded.") +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"),
+        plot.title = element_text(face = "bold"))
+```
+
+I used separate panels with different y-axis scales because CO concentrations are much larger than O3 concentrations. This makes both seasonal patterns readable while retaining ppm for both pollutants.
+
+For each month, I pooled all available daily values across years and calculated the mean and 95% confidence interval as mean +/- 1.96 x SD / sqrt(n), where n counts non-missing daily values. January-April include three years, while May-December include two.
+
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
+
+# PM2.5 by month and year
+
+```{r pm25, fig.height=3.5}
+# Summarize daily PM2.5 separately within each observed month and year.
+pm_monthly <- aggregate(PM25 ~ year + month, data = air, FUN = mean)
+write.csv(pm_monthly, "output/monthly_PM25.csv", row.names = FALSE)
+
+ggplot(pm_monthly, aes(month, PM25, color = factor(year),
+                       shape = factor(year), group = year)) +
+  geom_line(linewidth = 0.7) +
+  geom_point(size = 2.4) +
+  scale_color_manual(values = c("2018" = "#0072B2", "2019" = "#D55E00",
+                                "2020" = "#009E73"), name = "Year") +
+  scale_shape_manual(values = c(16, 17, 15), name = "Year") +
+  scale_x_continuous(breaks = 1:12, labels = month.abb) +
+  labs(title = "Monthly PM2.5 concentrations by year",
+       subtitle = "Means of daily concentrations",
+       x = "Month", y = "PM2.5 (ug/m3 LC)",
+       caption = "The 2020 series ends in April. Missing daily values excluded.") +
+  theme_minimal(base_size = 10) +
+  theme(legend.position = "bottom", panel.grid.minor = element_blank(),
+        plot.title = element_text(face = "bold"))
+```
+
+I used connected points for monthly means to show changes through the year and make differences between years easy to compare without overlapping daily observations.
+
+# Interpretation
+
+CO was highest in late fall and winter, while O3 was highest in spring and summer, with the pooled O3 mean peaking in June. PM2.5 varied across years rather than following one consistent seasonal pattern: August and December were higher in 2018 than in 2019, and January-February 2020 had lower means than either earlier year despite 2020 having the largest daily PM2.5 maximum (31.200 ug/m3 LC). That contrast shows why a single daily maximum does not describe a typical month; the 2020 comparison covers January-April only, and the pooled May-December estimates use two years instead of three.
+
+# AI use statement
+
+I used AI to help develop the cleaning function, organize the RMarkdown report, and draft the explanations. The code was run on all three input files, and its output was checked against separate calculations for daily averages, annual ranges, and monthly confidence intervals.
